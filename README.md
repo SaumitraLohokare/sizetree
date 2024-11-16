@@ -78,6 +78,13 @@ Feel free to open issues, contribute code, or suggest new features. Here's how y
 - Contribute: Fork the repo, create a branch, and submit a pull request.
 - Star the Repo: If you found this project helpful, give it a ⭐️!
 
+## 🚧 **Roadmap**
+Sizetree is just getting started! Here are some exciting features and improvements planned for the future:
+
+### 🗓 **Upcoming Features**
+- [ ] Multi-threaded scanning
+- [ ] File/Directory filtering
+
 ---
 
 Now go ahead and take control of your disk space like a pro! 🚀🌳
