@@ -15,12 +15,12 @@ impl FileTree {
 
 pub struct FileTreeNode {
     path: PathBuf,
-    size: u64,
+    size: Option<u64>,
     children: Vec<FileTreeNode>,
 }
 
 impl FileTreeNode {
-    pub fn new(path: PathBuf, size: u64) -> Self {
+    pub fn new(path: PathBuf, size: Option<u64>) -> Self {
         Self {
             path,
             size,
@@ -33,10 +33,10 @@ impl FileTreeNode {
     }
 
     pub fn update_size(&mut self, size: u64) {
-        self.size = size;
+        self.size = Some(size);
     }
 
-    pub fn size(&self) -> u64 {
+    pub fn size(&self) -> Option<u64> {
         self.size
     }
 

@@ -6,6 +6,7 @@ const KB: u64 = 1000;
 const MB: u64 = KB * 1000;
 const GB: u64 = MB * 1000;
 
+#[inline]
 pub fn file_size(path: &Path) -> Result<u64> {
     Ok(fs::metadata(path)?.len())
 }
