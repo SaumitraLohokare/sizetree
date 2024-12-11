@@ -1,0 +1,186 @@
+use std::{
+    env::args,
+    fs, io,
+    path::{Path, PathBuf}, process::exit,
+};
+
+const KB: u64 = 1000;
+const MB: u64 = KB * 1000;
+const GB: u64 = MB * 1000;
+
+const BLUE: &str = "\x1b[34m";
+const GREEN: &str = "\x1b[32m";
+const RESET: &str = "\x1b[0m";
+
+const PADDING_INC: usize = 1;
+
+struct Options {
+    skip_files: bool,
+    max_depth: usize,
+    paths: Vec<String>
+}
+
+impl Options {
+    pub fn new(args: Vec<String>, program_name: String) -> Self {
+        let mut paths = vec![];
+        let mut skip_files = false;
+        let mut max_depth = usize::max_value();
+        let mut reading_depth = false;
+
+        for arg in args {
+            match arg.as_str() {
+                "--only-dir" => skip_files = true,
+                "--depth" => reading_depth = true,
+                "-h" | "--help" => {
+                    usage(program_name);
+                    exit(0);
+                }
+                _ if reading_depth => {
+                    reading_depth = false;
+                    max_depth = arg.parse().expect("Invalid depth. Depth must be `usize`");
+                }
+                _ => paths.push(arg),
+            }
+        }
+
+        Self { skip_files, max_depth, paths }
+    }
+}
+
+fn usage(name: String) {
+    println!("\nUsage: {name} [OPTIONS] [PATH]...");
+    println!("\nOPTIONS:");
+    println!("  --only-dir            Prints only directories");
+    println!("  --depth <DEPTH>       Recursion depth (default: MAX)");
+    println!("\nPATHS:");
+    println!("  [path...]            Paths to scan (default: current directory)");
+}
+
+fn _main() -> io::Result<()> {
+
+    // Add a note saying that files without read permissions will be skipped
+    let mut args = args().into_iter();
+    let program_name = args.next().unwrap();
+
+    let args: Vec<String> = args.collect();
+
+    let opt = Options::new(args, program_name);
+
+    size_tree(opt)?;
+
+    Ok(())
+}
+
+fn size_tree(opt: Options) -> io::Result<()> {
+    if opt.paths.len() == 0 {
+        print_dir(&PathBuf::from("."), 0, opt.skip_files, 0, opt.max_depth)?;
+    }
+
+    for path in opt.paths {
+        let path = Path::new(&path);
+        if !path.exists() {
+            return Ok(());
+        }
+    
+        if path.is_file() {
+            println!(
+                "{} -> {}",
+                file_name(&path),
+                human_readable(file_size(&path)?)
+            );
+        } else if path.is_dir() {
+            print_dir(&path, 0, opt.skip_files, 0, opt.max_depth)?;
+        }
+    }
+    Ok(())
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .and_then(|name| name.to_str()) // Convert to &str if valid UTF-8
+        .map(|name| name.to_string()) // Convert &str to String
+        .unwrap_or_else(|| String::from("")) // Return empty string if no valid file name
+}
+
+fn dir_name(path: &Path) -> String {
+    // Split the path into its components and get the first directory name
+    let mut path = path.components()
+        .last() // Get the first component of the path (top-level directory)
+        .and_then(|comp| comp.as_os_str().to_str()) // Convert OsStr to &str if valid UTF-8
+        .map(|name| name.to_string()) // Convert &str to String
+        .unwrap_or_else(|| "ERR".to_string()); // Return "ERR" if no valid name is found
+    path.push('/');
+
+    path
+}
+
+fn file_size(path: &Path) -> io::Result<u64> {
+    Ok(fs::metadata(path)?.len())
+}
+
+fn human_readable(size: u64) -> String {
+    if size < KB {
+        format!("{size} B")
+    } else if size >= KB && size < MB {
+        let kb = (size / KB) as f64;
+        let b = (size % KB) as f64 / KB as f64;
+        format!("{:.02} KB", kb + b)
+    } else if size >= MB && size < GB {
+        let mb = (size / MB) as f64;
+        let kb = (size % MB) as f64 / MB as f64;
+        format!("{:.02} MB", mb + kb)
+    } else {
+        let gb = (size / GB) as f64;
+        let mb = (size % GB) as f64 / GB as f64;
+        format!("{:.02} GB", gb + mb)
+    }
+}
+
+fn print_dir(path: &Path, padding: usize, skip_files: bool, depth: usize, max_depth: usize) -> io::Result<u64> {
+    let mut size = 0;
+    let dir_name = dir_name(path);
+
+    let entries = match fs::read_dir(path) {
+        Ok(e) => e,
+        Err(_) => return Ok(0),
+    };
+
+    if depth.saturating_sub(1) < max_depth {
+        println!("{}─┬ {BLUE}{}{RESET}", get_pad_string(padding), dir_name);
+    }
+    for entry in entries {
+        let entry = entry?.path();
+
+        if entry.is_file() {
+            let file_size = file_size(&entry)?;
+            size += file_size;
+
+            if !skip_files && depth < max_depth {
+                println!(
+                    "{}─ {} [{}]",
+                    get_pad_string(padding + PADDING_INC),
+                    file_name(&entry),
+                    human_readable(file_size)
+                );
+            }
+        } else if entry.is_dir() {
+            size += print_dir(&entry, padding + PADDING_INC, skip_files, depth + 1, max_depth)?;
+        }
+    }
+
+    if depth.saturating_sub(1) < max_depth {
+        println!("{} ╰ Total: {GREEN}{}{RESET} ({BLUE}{:?}{RESET})", " │".repeat(padding), human_readable(size), path);
+    }
+
+    Ok(size)
+}
+
+fn get_pad_string(padding: usize) -> String {
+    if padding == 0 {
+        return "".to_string();
+    }
+
+    let mut pad = " │".repeat(padding.saturating_sub(PADDING_INC));
+    pad.push_str(" ├");
+    pad
+}
