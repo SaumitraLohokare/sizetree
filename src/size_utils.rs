@@ -13,7 +13,7 @@ pub fn file_size(path: &Path) -> Result<u64> {
 
 pub fn human_readable(size: u64) -> String {
     if size < KB {
-        format!("{size} B")
+        format!("{size}  B")
     } else if size >= KB && size < MB {
         let kb = (size / KB) as f64;
         let b = (size % KB) as f64 / KB as f64;
